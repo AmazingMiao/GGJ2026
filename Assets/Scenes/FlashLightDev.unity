@@ -501,7 +501,7 @@ GameObject:
   - component: {fileID: 1033933845}
   m_Layer: 0
   m_Name: Crystal
-  m_TagString: Untagged
+  m_TagString: FlashLightBeam
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -895,7 +895,7 @@ MonoBehaviour:
   m_BlendStyleIndex: 0
   m_FalloffIntensity: 0.5
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.01
+  m_Intensity: 3.21
   m_LightVolumeIntensity: 1
   m_LightVolumeEnabled: 0
   m_ApplyToSortingLayers: 00000000
@@ -946,10 +946,18 @@ MonoBehaviour:
   batterySlider: {fileID: 1136967008}
   batteryText: {fileID: 1845283695}
   maxBattery: 100
-  drainRate: 2
+  drainRate: 0
   smoothSpeed: 15
-  normalIntensity: 0.1
+  normalIntensity: 1
   lowBatteryIntensity: 0.05
+  sensitivity: 12
+  invertX: 1
+  invertY: 1
+  swapXY: 0
+  attitudeOffset: {x: 20, y: 0, z: 0}
+  debugAttitudeEuler: {x: 0, y: 0, z: 0}
+  debugRawXY: {x: 0, y: 0}
+  debugFinalXY: {x: 0, y: 0}
 --- !u!1 &1512568556
 GameObject:
   m_ObjectHideFlags: 0

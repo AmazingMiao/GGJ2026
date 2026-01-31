@@ -90,6 +90,12 @@ public class Player : MonoBehaviour
 
     
 
+   
+    public void CallAnimationTrigger()
+    {
+        stateMachine.currentState.CallAnimationTrigger();
+    }
+
     public void SetVelocity (float xVelocity, float yVelocity)      
     {
         rb.linearVelocity = new Vector2(xVelocity, yVelocity);

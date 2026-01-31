@@ -18,6 +18,18 @@ public class StationaryFlashlight : MonoBehaviour
     [SerializeField] private float normalIntensity = 1.0f;
     [SerializeField] private float lowBatteryIntensity = 0.2f;
 
+    [Header("Gyro Mapping")]
+    [SerializeField] private float sensitivity = 12f;
+    [SerializeField] private bool invertX = false;
+    [SerializeField] private bool invertY = false;
+    [SerializeField] private bool swapXY = false;
+    [SerializeField] private Vector3 attitudeOffset = Vector3.zero;
+
+    [Header("Debug Info (Read Only)")]
+    [SerializeField] private Vector3 debugAttitudeEuler;
+    [SerializeField] private Vector2 debugRawXY;
+    [SerializeField] private Vector2 debugFinalXY;
+
     private float _currentBattery;
     private Quaternion _initialRotation;
     private PlayerInputActions _inputActions;
@@ -41,84 +53,127 @@ public class StationaryFlashlight : MonoBehaviour
     void Start()
     {
         _currentBattery = maxBattery;
-
-        // 1. 修正：InputSystem.settings.sensorSamplingRate 是正确的 API
-        // if (InputSystem.settings != null)
-        // {
-        //     InputSystem.settings.sensorSamplingRate = 50f;
-        // }
-
-        // 2. 尝试手动启用传感器设备
-        var sensor = AttitudeSensor.current;
-        if (sensor != null)
-        {
-            InputSystem.EnableDevice(sensor);
-            Debug.Log("传感器已成功激活");
-        }
-        else
-        {
-            // 3. 如果依然为 null，尝试列出所有设备诊断
-            Debug.LogError("未检测到姿态传感器。请检查：\n" +
-                           "1. iPhone 是否已信任此电脑\n" +
-                           "2. iTunes 是否能看到手机\n" +
-                           "3. Unity Remote 5 是否在 Play 之前已启动");
-        
-            foreach (var device in InputSystem.devices)
-            {
-                if (device.name.Contains("Remote")) Debug.Log($"发现远程设备: {device.name}");
-            }
-        }
-        // 记录初始旋转，用于相对偏移
         _initialRotation = transform.rotation;
-        // 暂时使用一下以消除警告
         Debug.Log($"Initial Rotation: {_initialRotation}");
     }
 
     void Update()
     {
-        // 获取鼠标位置（如果需要通过 Action 获取）
-        // 注意：如果 PlayerInputActions 中没有定义 MousePosition Action，
-        // 也可以直接在 Update 中使用 Mouse.current.position.ReadValue()
-        // 这里演示如何通过 Action 获取（假设你在配置中添加了 Point 或 Position Action）
+        // 动态检测并启用传感器，解决 Unity Remote 延迟连接问题
+        EnsureSensorsEnabled();
         
         UpdateFlashlightRotation();
         UpdateBattery();
+    }
+
+    private void EnsureSensorsEnabled()
+    {
+        // 尝试启用 AttitudeSensor
+        if (AttitudeSensor.current != null && !AttitudeSensor.current.enabled)
+        {
+            InputSystem.EnableDevice(AttitudeSensor.current);
+            Debug.Log("AttitudeSensor 已动态激活");
+        }
+
+        // 尝试启用 Gyroscope (飞鼠效果需要)
+        if (UnityEngine.InputSystem.Gyroscope.current != null && !UnityEngine.InputSystem.Gyroscope.current.enabled)
+        {
+            InputSystem.EnableDevice(UnityEngine.InputSystem.Gyroscope.current);
+            Debug.Log("Gyroscope 已动态激活");
+        }
+
+        // 备选：启用重力感应器
+        if (GravitySensor.current != null && !GravitySensor.current.enabled)
+        {
+            InputSystem.EnableDevice(GravitySensor.current);
+            Debug.Log("GravitySensor 已动态激活");
+        }
     }
 
     private void UpdateFlashlightRotation()
     {
         if (_currentBattery <= 0) return;
 
-        // 强制检查：如果传感器没连上或者没启用，就走鼠标逻辑
-        bool isGyroAvailable = AttitudeSensor.current != null && AttitudeSensor.current.enabled;
-
-        if (isGyroAvailable)
+        // 检查 AttitudeSensor 是否可用且已启用
+        var attitudeSensor = AttitudeSensor.current;
+        if (attitudeSensor != null && attitudeSensor.enabled)
         {
-            // 1. 手机传感器控制逻辑 (如果需要陀螺仪控制移动，这里可以根据姿态计算位移，目前保留逻辑结构)
-            Quaternion attitude = AttitudeSensor.current.attitude.ReadValue();
-            // 暂时保留传感器逻辑，但如果用户确定完全不需要旋转且传感器只用于旋转，此处可根据需求修改为位移
-        }
-        else
-        {
-            // 2. 使用 PlayerInputActions 的鼠标控制逻辑：跟随光标位置
-            Vector2 mouseScreenPos = _inputActions.Player.Point.ReadValue<Vector2>();
+            // 1. 手机姿态控制逻辑 (指哪打哪效果)
+            Quaternion rawAttitude = attitudeSensor.attitude.ReadValue();
             
-            if (Time.frameCount % 60 == 0) Debug.Log($"Mouse Screen Pos: {mouseScreenPos}");
+            // 应用初始姿态偏移
+            Quaternion offsetRotation = Quaternion.Euler(attitudeOffset);
+            Quaternion attitude = rawAttitude * offsetRotation;
+            
+            debugAttitudeEuler = attitude.eulerAngles; // Debug 显示
+            
+            // 【核心修正】：在 Input System 的 AttitudeSensor 中，
+            // 手机背对用户（摄像头指向屏幕）时，手机的“前方”实际上是 -Vector3.up (竖屏) 或 Vector3.forward (平放)
+            // 为了实现“摄像头指哪打哪”，我们使用手机的局部 Z 轴 (Vector3.forward)
+            // 并将其转换到世界空间，然后提取其在水平和垂直方向上的投影
+            Vector3 cameraDir = attitude * Vector3.forward;
+            
+            // 使用 Atan2 提取偏航角 (Yaw) 和 俯仰角 (Pitch)
+            // 尝试更换偏航角的计算轴：从 (x, z) 改为 (x, y) 或 (z, y) 等，
+            // 这里根据用户反馈“偏航轴错误”，通常是因为手机竖屏/横屏状态下 forward 向量的参考系不同。
+            // 尝试使用 cameraDir.x 和 cameraDir.y 的组合，或者调整 Atan2 的参数顺序。
+            // 修正：使用 x 和 y 来计算水平偏航，这在某些握持姿态下更符合直觉
+            float yaw = Mathf.Atan2(cameraDir.x, -cameraDir.y) * Mathf.Rad2Deg;
+            float pitch = Mathf.Asin(cameraDir.z) * Mathf.Rad2Deg;
 
-            Camera mainCam = Camera.main;
-            if (mainCam == null)
-            {
-                Debug.LogError("Missing Main Camera!");
-                return;
-            }
+            // 将角度映射到屏幕位移
+            float rawX = yaw / 45f;   // 假设 45 度达到灵敏度边界
+            float rawY = pitch / 45f;
+            
+            debugRawXY = new Vector2(rawX, rawY); // Debug 显示
 
-            // 将屏幕坐标转换为世界坐标
-            Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(new Vector3(mouseScreenPos.x, mouseScreenPos.y, Mathf.Abs(mainCam.transform.position.z)));
-            mouseWorldPos.z = 0;
+            // 根据 Editor 设置进行轴向调整
+            float finalX = swapXY ? rawY : rawX;
+            float finalY = swapXY ? rawX : rawY;
 
-            // 直接平滑移动到目标位置
-            transform.position = Vector3.Lerp(transform.position, mouseWorldPos, Time.deltaTime * smoothSpeed);
+            finalX *= (invertX ? -1f : 1f);
+            finalY *= (invertY ? -1f : 1f);
+            debugFinalXY = new Vector2(finalX, finalY); // Debug 显示
+
+            Vector3 targetWorldPos = new Vector3(finalX * sensitivity, finalY * sensitivity, 0);
+
+            // 平滑移动到目标位置
+            transform.position = Vector3.Lerp(transform.position, targetWorldPos, Time.deltaTime * smoothSpeed);
+
+            // 限制在屏幕范围内
+            ClampToScreen();
+            return;
         }
+
+        // 2. 使用 PlayerInputActions 的鼠标控制逻辑：跟随光标位置
+        Vector2 mouseScreenPos = _inputActions.Player.Point.ReadValue<Vector2>();
+        
+        if (Time.frameCount % 60 == 0) Debug.Log($"Mouse Screen Pos: {mouseScreenPos}");
+
+        Camera mainCam = Camera.main;
+        if (mainCam == null)
+        {
+            Debug.LogError("Missing Main Camera!");
+            return;
+        }
+
+        // 将屏幕坐标转换为世界坐标
+        Vector3 mouseWorldPos = mainCam.ScreenToWorldPoint(new Vector3(mouseScreenPos.x, mouseScreenPos.y, Mathf.Abs(mainCam.transform.position.z)));
+        mouseWorldPos.z = 0;
+
+        // 直接平滑移动到目标位置
+        transform.position = Vector3.Lerp(transform.position, mouseWorldPos, Time.deltaTime * smoothSpeed);
+    }
+
+    private void ClampToScreen()
+    {
+        Camera mainCam = Camera.main;
+        if (mainCam == null) return;
+
+        Vector3 pos = mainCam.WorldToViewportPoint(transform.position);
+        pos.x = Mathf.Clamp01(pos.x);
+        pos.y = Mathf.Clamp01(pos.y);
+        transform.position = mainCam.ViewportToWorldPoint(pos);
     }
 
     private void UpdateBattery()
