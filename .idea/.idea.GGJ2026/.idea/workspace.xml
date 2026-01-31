@@ -43,7 +43,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "ml.llm.LLMThirdPartyAiProvidersConfigurable",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
@@ -94,7 +94,7 @@
       <option name="presentableId" value="Default" />
       <updated>1769331873706</updated>
       <workItem from="1769331875132" duration="38000" />
-      <workItem from="1769332351669" duration="996000" />
+      <workItem from="1769332351669" duration="2588000" />
     </task>
     <servers />
   </component>
