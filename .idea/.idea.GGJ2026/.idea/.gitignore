@@ -2,9 +2,9 @@
 /shelf/
 /workspace.xml
 # Rider 忽略的文件
-/contentModel.xml
 /modules.xml
 /projectSettingsUpdater.xml
+/contentModel.xml
 /.idea.GGJ2026.iml
 # 已忽略包含查询文件的默认文件夹
 /queries/

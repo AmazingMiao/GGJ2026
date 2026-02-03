@@ -42,6 +42,15 @@ public class Player : MonoBehaviour
     [SerializeField] private Transform primaryWallCheck;
     [SerializeField] private Transform secondaryWallCheck;
 
+    [Header("Audio Settings")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioSource loopAudioSource;
+    [SerializeField] public AudioClip jumpSound;
+    [SerializeField] public AudioClip wallJumpSound;
+    [SerializeField] public AudioClip landSound;
+    [SerializeField] public AudioClip moveSound;
+    [SerializeField] public AudioClip wallSlideSound;
+
     public bool groundDetected { get; private set; }
     public bool wallDetected { get; private set; }
 
@@ -49,6 +58,9 @@ public class Player : MonoBehaviour
     {
         anim = GetComponentInChildren<Animator>();
         rb = GetComponent<Rigidbody2D>();
+        
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
 
         stateMachine = new StateMachine();
         input = new PlayerInputActions();
@@ -90,23 +102,51 @@ public class Player : MonoBehaviour
 
     
 
-   
-    public void CallAnimationTrigger()
+    public void SetVelocity(float _xVelocity, float _yVelocity)
     {
-        stateMachine.currentState.CallAnimationTrigger();
+        rb.linearVelocity = new Vector2(_xVelocity, _yVelocity);
+        FlipController(_xVelocity);
     }
 
-    public void SetVelocity (float xVelocity, float yVelocity)      
+    public void PlaySound(AudioClip clip)
     {
-        rb.linearVelocity = new Vector2(xVelocity, yVelocity);
-        HandleFlip(xVelocity);
+        if (audioSource != null && clip != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
     }
 
-    private void HandleFlip(float xVelocity)
+    public void PlayLoopSound(AudioClip clip)
     {
-        if (xVelocity > 0 && !facingRight)
+        if (loopAudioSource != null && clip != null)
+        {
+            if (loopAudioSource.clip == clip && loopAudioSource.isPlaying) return;
+            loopAudioSource.clip = clip;
+            loopAudioSource.loop = true;
+            loopAudioSource.Play();
+            Debug.Log($"[Audio] Playing Loop Sound: {clip.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[Audio] Cannot play loop sound. Source: {loopAudioSource}, Clip: {clip}");
+        }
+    }
+
+    public void StopLoopSound()
+    {
+        if (loopAudioSource != null)
+        {
+            Debug.Log($"[Audio] Stopping Loop Sound: {loopAudioSource.clip?.name}");
+            loopAudioSource.Stop();
+            loopAudioSource.clip = null;
+        }
+    }
+
+    private void FlipController(float _xVelocity)
+    {
+        if (_xVelocity > 0 && !facingRight)
             Flip();
-        else if (xVelocity < 0 && facingRight)
+        else if (_xVelocity < 0 && facingRight)
             Flip();
             
     }
@@ -116,6 +156,17 @@ public class Player : MonoBehaviour
         facingRight = !facingRight;
         facingDir = facingDir * -1;
     }
+    
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        // 检测是否碰到标记为 "Finish" 的物体
+        if (collision.CompareTag("Finish"))
+        {
+            LevelManager.Instance.LoadNextScene();
+        }
+    }
+    
 
     private void HandleCollisionDetection()
     {

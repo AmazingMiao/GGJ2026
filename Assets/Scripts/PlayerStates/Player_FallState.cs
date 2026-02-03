@@ -10,7 +10,10 @@ public class Player_FallState : Player_AiredState
     {
         base.Update();
         if (player.groundDetected)
+        {
+            player.PlaySound(player.landSound);
             stateMachine.ChangeState(player.idleState);
+        }
 
         if(player.wallDetected)
             stateMachine.ChangeState(player.wallSlideState);

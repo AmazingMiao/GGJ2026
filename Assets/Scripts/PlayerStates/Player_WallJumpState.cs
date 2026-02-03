@@ -10,6 +10,7 @@ public class Player_WallJumpState : EntityState
     public override void Enter()
     {
         base.Enter();
+        player.PlaySound(player.wallJumpSound);
         player.SetVelocity(player.wallJumpDir.x * -player.facingDir, player.wallJumpDir.y);
 
     }

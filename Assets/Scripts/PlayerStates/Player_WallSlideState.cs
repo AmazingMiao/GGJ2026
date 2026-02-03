@@ -6,6 +6,21 @@ public class Player_WallSlideState : EntityState
     {
     }
 
+    public override void Enter()
+    {
+        base.Enter();
+        player.PlayLoopSound(player.wallSlideSound);
+        player.anim.transform.localScale = new Vector3(-1, 1, 1);
+
+    }
+
+    public override void Exit()
+    {
+        base.Exit();
+        player.StopLoopSound();
+        player.anim.transform.localScale = new Vector3(1, 1, 1);
+        
+    }
 
     public override void Update()
     {

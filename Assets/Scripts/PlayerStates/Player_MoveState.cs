@@ -6,9 +6,22 @@ public class Player_MoveState : Player_GroundedState
     {
     }
 
+    public override void Enter()
+    {
+        base.Enter();
+        player.PlayLoopSound(player.moveSound);
+    }
+
+    public override void Exit()
+    {
+        base.Exit();
+        player.StopLoopSound();
+    }
+
     public override void Update()
     {
         base.Update();
+
 
         if (player.moveInput.x == 0 || player.wallDetected) 
             stateMachine.ChangeState(player.idleState);

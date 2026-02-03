@@ -3,7 +3,7 @@ using UnityEngine;
 public class Crystal : MonoBehaviour
 {
     [Header("Status")]
-    [SerializeField] private bool isIlluminated = false;
+    [SerializeField] protected bool isIlluminated;
     public bool IsIlluminated => isIlluminated;
 
     [Header("Settings")]
@@ -13,7 +13,10 @@ public class Crystal : MonoBehaviour
     [SerializeField] private LayerMask lightLayer;
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private Door targetDoor;
-    [SerializeField] private bool stayOpenAfterIlluminated = false;
+    [SerializeField] private bool stayOpenAfterIlluminated;
+
+    [Tooltip("是否只能被镜子反射的光照亮")]
+    [SerializeField] private bool onlyMirrorLight;
 
     private void Start()
     {
@@ -27,7 +30,7 @@ public class Crystal : MonoBehaviour
         UpdateVisuals();
     }
 
-    private void UpdateVisuals()
+    protected virtual void UpdateVisuals()
     {
         if (spriteRenderer != null)
         {
@@ -48,31 +51,55 @@ public class Crystal : MonoBehaviour
         }
     }
 
-    private void CheckIllumination()
+    protected virtual void CheckIllumination()
     {
-        // 在 2D URP 中，光照通常不直接通过物理碰撞检测
-        // 这里使用 OverlapPoint 或 OverlapCircle 检测是否有 Light2D 的包围盒或特定触发器
-        // 但最通用的做法是检测手电筒（或其他光源）的距离和角度，或者使用触发器
+        // 增加主动检测逻辑，防止触发器状态丢失
+        // 检测当前是否仍有有效光源在接触
+        ContactFilter2D filter = new ContactFilter2D();
+        filter.useTriggers = true;
+        Collider2D[] results = new Collider2D[10];
+        int count = GetComponent<Collider2D>().Overlap(filter, results);
         
-        // 方案：检测是否有带有 Light2D 组件的物体发出的光照射到此处
-        // 注意：Unity 2D Light 并没有内置的 "IsPointIlluminated" API
-        // 常用替代方案：在手电筒上加一个带有 Trigger 的子物体代表光束区域
+        bool foundLight = false;
+        for (int i = 0; i < count; i++)
+        {
+            if (IsCorrectLightSource(results[i]))
+            {
+                foundLight = true;
+                break;
+            }
+        }
+        isIlluminated = foundLight;
     }
 
     // 推荐方案：使用触发器检测
-    private void OnTriggerEnter2D(Collider2D other)
+    protected virtual void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("FlashLightBeam"))
+        if (IsCorrectLightSource(other))
         {
             isIlluminated = true;
         }
     }
 
-    private void OnTriggerExit2D(Collider2D other)
+    protected virtual void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("FlashLightBeam"))
+        if (IsCorrectLightSource(other))
         {
             isIlluminated = false;
+        }
+    }
+
+    protected bool IsCorrectLightSource(Collider2D other)
+    {
+        if (onlyMirrorLight)
+        {
+            // 仅接受标签为 MirrorBeam 的触发器
+            return other.CompareTag("MirrorBeam");
+        }
+        else
+        {
+            // 接受普通手电筒或镜子光束
+            return other.CompareTag("FlashLightBeam") || other.CompareTag("MirrorBeam");
         }
     }
 

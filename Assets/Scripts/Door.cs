@@ -10,6 +10,11 @@ public class Door : MonoBehaviour
     [Header("Spline Settings")]
     [SerializeField] private SplineAnimate splineAnimate;
 
+    [Header("Audio Settings")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip openSound;
+    [SerializeField] private AudioClip closeSound;
+
     private bool _lastState;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -17,6 +22,9 @@ public class Door : MonoBehaviour
     {
         if (splineAnimate == null)
             splineAnimate = GetComponent<SplineAnimate>();
+        
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
         
         _lastState = isOpen;
         
@@ -50,6 +58,9 @@ public class Door : MonoBehaviour
         // 停止之前的 Tween 动画，防止冲突
         DOTween.Kill(splineAnimate);
 
+        // 播放对应音效
+        PlaySound(open ? openSound : closeSound);
+
         if (open)
         {
             // 使用 DOTween 平滑控制 NormalizedTime 到 1
@@ -65,6 +76,14 @@ public class Door : MonoBehaviour
                 .SetTarget(splineAnimate)
                 .SetEase(Ease.InOutQuad);
             Debug.Log("Door Closing Smoothly...");
+        }
+    }
+
+    private void PlaySound(AudioClip clip)
+    {
+        if (audioSource != null && clip != null)
+        {
+            audioSource.PlayOneShot(clip);
         }
     }
 
